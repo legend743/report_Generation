@@ -13,8 +13,10 @@ import com.itextpdf.text.DocumentException;
 import com.itextpdf.text.Element;
 import com.itextpdf.text.Font;
 import com.itextpdf.text.Font.FontFamily;
+import com.itextpdf.text.FontFactory;
 import com.itextpdf.text.List;
 import com.itextpdf.text.ListItem;
+import com.itextpdf.text.Paragraph;
 import com.itextpdf.text.Phrase;
 import com.itextpdf.text.Rectangle;
 import com.itextpdf.text.pdf.PdfPCell;
@@ -30,16 +32,45 @@ public class PdfGenerationServiceImpl implements PdfGenerationService {
     
     public File generateWorkOrderReport(long workOrderId) {
         PdfWriter writer = null;
+        
+        String[] headers = {"ICCIDs", "Permanent IMSI", "MSISDN"};
+        String[][] data = {
+            {"8991000092210000000F", "405561025717506", "919954602402"},
+            {"8991000092210025682F", "405561025719197", "919957850567"},
+            {"8991000092210053136F", "405561021510175", "919954860761"},
+            {"8991000092210079704F", "405561025721002", "919954652582"}
+        };
+        
+        String machineIdValue = "2021118";
+
+        // Headers for the table
+        String[] headersForThick = {"Sr. No.", "ICCID", "Specification\n(0.10 mm allowed on embossed cards included in max values allowed)", "Observed Values\n(Chip Down)", "Remarks\n(OK/NOT OK)"};        
+        String[][] dataThick = {
+                {"1", "8991000922100000006F", "0.68 mm to 0.84 mm", "0.71 mm", "OK"},
+                {"2", "8991000922100265682F", "0.68 mm to 0.84 mm", "0.70 mm", "OK"},
+                {"3", "8991000922100531364F", "0.68 mm to 0.84 mm", "0.69 mm", "OK"},
+                {"4", "8991000922100797049F", "0.68 mm to 0.84 mm", "0.70 mm", "OK"}
+            };
+        
         try {
             Document document = new Document();
             String fileName = "WorkOrderReport.pdf";
 
             writer = PdfWriter.getInstance(document, new FileOutputStream(fileName));
             document.open();
-            generateCoverPage(document, writer);
+            generateCoverPage( document,writer);
             generateContentsPage(document);
             generateWoInfo(document);
+            getPageOne(document,"Haryana");
+            TestCasesSelection(document);
+            getSIMDetailsPage(document,headers, data);
+            addTestingSection(document);
+            addPhysicalTestingSection(document);
+            addTestingTable(document,machineIdValue, headersForThick, dataThick);
+            
+            
             generateSectionPages(document);
+            
             
             document.close();
             File file = new File(fileName);
@@ -53,6 +84,209 @@ public class PdfGenerationServiceImpl implements PdfGenerationService {
         }
         return null;
     }
+// --------------page 7 Testing vital testing-----------------------------------
+    private static void addTestingSection(Document document) throws DocumentException {
+        // Add "2 Testing" title
+    	document.newPage();
+    	Font titleFont = FontFactory.getFont(FontFactory.TIMES_BOLD, 14f);
+        Paragraph testingTitle = new Paragraph("2 Testing", titleFont);
+        testingTitle.setSpacingBefore(20f);
+        testingTitle.setSpacingAfter(10f);
+        document.add(testingTitle);
+
+        // Add "2.1 Vital Testing" subtitle
+        Font subtitleFont = FontFactory.getFont(FontFactory.TIMES_BOLD, 13f);
+        Paragraph vitalTestingSubtitle = new Paragraph("2.1 Vital Testing", subtitleFont);
+        vitalTestingSubtitle.setSpacingBefore(10f);
+        vitalTestingSubtitle.setSpacingAfter(10f);
+        document.add(vitalTestingSubtitle);
+
+        // Add bullet points
+        Font bulletFont = FontFactory.getFont(FontFactory.TIMES, 12f);
+        List vitalTestingList = new List(List.UNORDERED);
+        vitalTestingList.setListSymbol("");
+        vitalTestingList.add(new ListItem("1.Tested look and feel of the cards received and found cards are ok.", bulletFont));
+        vitalTestingList.add(new ListItem("2.Checked file system of the cards received and found files accessible.", bulletFont));
+        document.add(vitalTestingList);
+    }
+    
+    //--------------------page 7-----------------------------------------
+    private static void addPhysicalTestingSection(Document document) throws DocumentException {
+        // Add "2.2 Physical Testing" title
+        Font titleFont = FontFactory.getFont(FontFactory.TIMES_BOLD, 14f);
+        Paragraph physicalTestingTitle = new Paragraph("2.2 Physical Testing", titleFont);
+        physicalTestingTitle.setSpacingBefore(20f);
+        physicalTestingTitle.setSpacingAfter(10f);
+        document.add(physicalTestingTitle);
+
+        // Add "2.2.1 Test Procedure" subtitle
+        Font subtitleFont = FontFactory.getFont(FontFactory.TIMES_BOLD, 13f);
+        Paragraph testProcedureSubtitle = new Paragraph("2.2.1 Test Procedure", subtitleFont);
+        testProcedureSubtitle.setSpacingBefore(10f);
+        testProcedureSubtitle.setSpacingAfter(10f);
+        document.add(testProcedureSubtitle);
+
+        // Add test procedure text
+        Font bodyFont = FontFactory.getFont(FontFactory.TIMES, 12f);
+        Paragraph testProcedureText = new Paragraph("In physical testing we examine the physical features and appearance of the SIM cards as per standards. There are two test cases in physical testing.", bodyFont);
+        testProcedureText.setSpacingBefore(10f);
+        testProcedureText.setSpacingAfter(10f);
+        document.add(testProcedureText);
+    }
+
+    private static void addTestingTable(Document document, String machineIdValue, String[] headers, String[][] data) throws DocumentException {
+        // Create table with an extra row for Machine ID
+        PdfPTable table = new PdfPTable(headers.length); // Extra column for Machine ID
+        table.setWidthPercentage(100);
+        table.setSpacingBefore(10f);
+
+        // Add the "Machine ID" cell spanning all columns
+        Font machineFont = FontFactory.getFont(FontFactory.TIMES_BOLD, 13f);
+        PdfPCell machineIdCell = new PdfPCell(new Phrase("Machine ID: " + machineIdValue + "    Go-no-Go Gauge [3FF & 4FF] Testing (Slip Gauge)", machineFont));
+        machineIdCell.setColspan(headers.length);
+        machineIdCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        machineIdCell.setPadding(10f);
+        table.addCell(machineIdCell);
+
+        // Set table headers
+        Font headerFont = FontFactory.getFont(FontFactory.TIMES_BOLD, 12f);
+        for (String header : headers) {
+            PdfPCell headerCell = new PdfPCell(new Phrase(header, headerFont));
+            headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            table.addCell(headerCell);
+        }
+
+        // Add table data
+        Font bodyFont = FontFactory.getFont(FontFactory.TIMES, 12f);
+        BaseColor lightBlue = new BaseColor(179, 217, 255);
+        BaseColor blue = new BaseColor(153, 204, 255);
+        boolean alternateColor = true;
+        for (String[] row : data) {
+            for (String cellData : row) {
+                PdfPCell dataCell = new PdfPCell(new Phrase(cellData, bodyFont));
+                dataCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                dataCell.setBorderColor(BaseColor.BLUE);
+                dataCell.setBackgroundColor(alternateColor ? lightBlue : blue);
+                table.addCell(dataCell);
+            }
+            alternateColor = !alternateColor; // Switch colors for the next row
+        }
+
+        document.add(table);
+    }
+//    ---------------------page 6---------------------------------------
+   
+    private static void getSIMDetailsPage(Document document, String[] headers, String[][] data) throws DocumentException {
+        document.newPage(); // Create a new page
+
+        // Add title
+        Font titleFont = FontFactory.getFont(FontFactory.TIMES_BOLD, 13f);
+        Phrase titlePhrase = new Phrase("1.3 SIM Details", titleFont);
+        PdfPCell titleCell = new PdfPCell(titlePhrase);
+        titleCell.setBorder(Rectangle.NO_BORDER);
+        titleCell.setHorizontalAlignment(Element.ALIGN_LEFT);
+        titleCell.setMinimumHeight(25);
+        PdfPTable titleTable = new PdfPTable(1);
+        titleTable.setWidthPercentage(100);
+        titleTable.addCell(titleCell);
+        document.add(titleTable);
+
+        // Add table
+        PdfPTable table = new PdfPTable(headers.length);
+        table.setWidthPercentage(100);
+        table.setSpacingBefore(10f);
+
+        // Set table headers
+        Font headerFont = FontFactory.getFont(FontFactory.TIMES_BOLD, 13f);
+        for (String header : headers) {
+            PdfPCell headerCell = new PdfPCell(new Phrase(header, headerFont));
+            headerCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            table.addCell(headerCell);
+        }
+
+        // Add table data
+        Font bodyFont = FontFactory.getFont(FontFactory.TIMES, 13f);
+        BaseColor lightBlue = new BaseColor(179, 217, 255);
+        BaseColor blue = new BaseColor(153, 204, 255);
+        boolean alternateColor = true;
+        for (String[] row : data) {
+            for (String cellData : row) {
+                PdfPCell dataCell = new PdfPCell(new Phrase(cellData, bodyFont));
+                dataCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                
+                dataCell.setBackgroundColor(alternateColor ? lightBlue : blue);
+                table.addCell(dataCell);
+            }
+            alternateColor = !alternateColor; // Switch colors for the next row
+        }
+
+        document.add(table);
+    }    	
+
+    
+    	  private void getPageOne(Document document,String circleName) throws DocumentException {
+    	        document.newPage(); // Create a new page
+    	        PdfPTable table = new PdfPTable(1); // Single column table for the text
+
+    	        // Heading cell
+    	        PdfPCell headingCell = new PdfPCell();
+    	        headingCell.setPhrase(new Phrase("1.1 Test Requested", new Font(Font.FontFamily.TIMES_ROMAN, 13f, Font.BOLD)));
+    	        headingCell.setBorder(Rectangle.NO_BORDER);
+    	        headingCell.setHorizontalAlignment(Element.ALIGN_LEFT);
+    	        headingCell.setMinimumHeight(25);
+    	        table.addCell(headingCell);
+
+    	        // Body text cell
+    	        PdfPCell bodyCell = new PdfPCell();
+    	        bodyCell.setPhrase(new Phrase("In this work order Airtel SIM Lab is intending to perform the complete Offline and Online testing on above mentioned BATCH Cards received from "+circleName+ " circle.", new Font(Font.FontFamily.TIMES_ROMAN, 13f, Font.NORMAL)));
+    	        bodyCell.setBorder(Rectangle.NO_BORDER);
+    	        bodyCell.setHorizontalAlignment(Element.ALIGN_LEFT);
+    	        bodyCell.setMinimumHeight(25);
+    	        table.addCell(bodyCell);
+
+    	        // Add the table to the document
+    	        document.add(table);
+    	    }
+// -------------------page 5--------------------   
+    	  private void TestCasesSelection(Document document) throws DocumentException {
+    		    document.newPage();
+    		    PdfPTable table = new PdfPTable(1);
+    		    PdfPCell headingCell = new PdfPCell();
+    		    headingCell.setPhrase(new Phrase("1.2 Test Case Selection", new Font(FontFamily.TIMES_ROMAN, 13f, Font.BOLD)));
+    		    headingCell.setBorder(Rectangle.NO_BORDER);
+    		    headingCell.setHorizontalAlignment(Element.ALIGN_LEFT);
+    		    headingCell.setMinimumHeight(25);
+    		    table.addCell(headingCell);
+
+    		    // Body Text Cell
+    		    PdfPCell bodyCell = new PdfPCell();
+    		    bodyCell.setPhrase(new Phrase("Following test cases were selected based on the test requested."));
+    		    bodyCell.setBorder(Rectangle.NO_BORDER); // Assuming no border, adjust as necessary
+    		    table.addCell(bodyCell);
+
+    		    document.add(table); // Missing semicolon added here
+
+    		    try {
+    		        Font font = new Font(FontFamily.TIMES_ROMAN, 13f, Font.NORMAL);
+    		        List testCaseList = new List(12);
+    		        testCaseList.setListSymbol("\u2022");
+
+    		        testCaseList.add(new ListItem("Vital Testing", font));
+    		        testCaseList.add(new ListItem("Physical Testing", font));
+    		        testCaseList.add(new ListItem("Profile Conformance Against Latest Profile", font));
+    		        testCaseList.add(new ListItem("Constant Voltage Stress Testing", font));
+    		        testCaseList.add(new ListItem("Voltage Testing on Class A, B & C", font));
+    		        testCaseList.add(new ListItem("Online Testing on Multiple Handsets", font));
+    		        testCaseList.add(new ListItem("DSTK Testing", font));
+    		        testCaseList.add(new ListItem("OTA Testing", font));
+
+    		        testCaseList.setIndentationLeft(90);
+    		        document.add(testCaseList);
+
+    		    } catch (DocumentException e) {
+    		        e.printStackTrace();
+    		    }
+    		}
 
     private void generateCoverPage(Document document, PdfWriter writer) throws DocumentException, IOException {
         Phrase dTypePhrase = new Phrase("SIM Lab Report", new Font(FontFamily.TIMES_ROMAN, 14f, Font.NORMAL));
@@ -115,58 +349,26 @@ public class PdfGenerationServiceImpl implements PdfGenerationService {
         table.addCell(getWoInfoTableNameColumn("Test Result(s)"));
         table.addCell(getWoInfoTableValueColumn("Please refer to next pages(s)"));
 
-        float[] pointColumnWidthParagraph = { 300F };
-        PdfPTable secondTable = new PdfPTable(pointColumnWidthParagraph);
-
-        cell = new PdfPCell();
-        cell.setBorder(Rectangle.NO_BORDER);
-        cell.setMinimumHeight(50);
-        secondTable.addCell(cell);
-        document.newPage();
-        cell = new PdfPCell();
-        cell.setPhrase(new Phrase("1.1 Test Requested", new Font(FontFamily.TIMES_ROMAN, 13f, Font.BOLD)));
-        cell.setBorder(Rectangle.NO_BORDER);
-        cell.setHorizontalAlignment(Element.ALIGN_LEFT);
-        cell.setMinimumHeight(25);
-        secondTable.addCell(cell);
-
-        cell = new PdfPCell();
-        cell.setPhrase(new Phrase("In this work order Airtel SIM Lab is intending to perform the complete Offline and Online testing on above metioned BATCH Cards received from xxx circle.", new Font(FontFamily.TIMES_ROMAN, 13f, Font.NORMAL)));
-        cell.setBorder(Rectangle.NO_BORDER);
-        cell.setHorizontalAlignment(Element.ALIGN_LEFT);
-        cell.setMinimumHeight(25);
-        secondTable.addCell(cell);
-
-        cell = new PdfPCell();
-        cell.setPhrase(new Phrase("1.2 Test Cases Selected", new Font(FontFamily.TIMES_ROMAN, 13f, Font.BOLD)));
-        cell.setBorder(Rectangle.NO_BORDER);
-        cell.setHorizontalAlignment(Element.ALIGN_LEFT);
-        cell.setMinimumHeight(25);
-        secondTable.addCell(cell);
-
-        cell = new PdfPCell();
-        cell.setPhrase(new Phrase("Following test cases were selected based on work order type",
-                new Font(FontFamily.TIMES_ROMAN, 13f, Font.NORMAL)));
-        cell.setBorder(Rectangle.NO_BORDER);
-        cell.setHorizontalAlignment(Element.ALIGN_LEFT);
-        cell.setMinimumHeight(25);
-        secondTable.addCell(cell);
-
+            document.newPage();
+    
         // Adding Table to document
         document.add(table);
-        document.add(secondTable);
-
-        Font font = new Font(FontFamily.TIMES_ROMAN, 13f, Font.NORMAL);
-        List testCaseList = new List(12);
-        testCaseList.setListSymbol("\u2022");
-
-        testCaseList.add(new ListItem(30, "Placeholder Test Case 1", font));
-        testCaseList.add(new ListItem(30, "Placeholder Test Case 2", font));
-
-        testCaseList.setIndentationLeft(90);
-        document.add(testCaseList);
-    }
+        }
 //---------------------------------------------------------------------------------------------------
+    private void generateStaticContentPage(Document document, String circle) throws DocumentException {
+    	 document.newPage(); // Create a new page
+         PdfPTable table = new PdfPTable(1); // Single column table for the text
+         PdfPCell cell = new PdfPCell();
+         cell.setPhrase(new Phrase("In this work order Airtel SIM Lab is intending to perform the complete Offline and Online testing on above mentioned BATCH Cards received from xxx circle.", new Font(Font.FontFamily.TIMES_ROMAN, 13f, Font.NORMAL)));
+         cell.setBorder(Rectangle.NO_BORDER);
+         cell.setHorizontalAlignment(Element.ALIGN_LEFT);
+         cell.setMinimumHeight(25);
+         table.addCell(cell);
+         document.add(table);
+
+
+    	
+    }
     private void generateContentsPage(Document document) throws DocumentException {
         document.newPage();
         Font titleFont = new Font(FontFamily.TIMES_ROMAN, 14f, Font.BOLD);
@@ -279,4 +481,65 @@ public class PdfGenerationServiceImpl implements PdfGenerationService {
         cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
         return cell;
     }
+
+//-------------------------------------------------------------------------------
+//private void generateWoInfo(Document document) throws DocumentException {
+//    SimpleDateFormat simpleDateFormat = new SimpleDateFormat("dd MMM yy");
+//    float[] pointColumnWidths = { 150F, 150F };
+//    PdfPTable table = new PdfPTable(pointColumnWidths);
+//
+//    PdfPCell cell = new PdfPCell();
+//    cell.setPhrase(new Phrase("1 Work Order Details", new Font(FontFamily.TIMES_ROMAN, 14f, Font.BOLD)));
+//    cell.setBorder(Rectangle.NO_BORDER);
+//    cell.setMinimumHeight(25);
+//    cell.setHorizontalAlignment(Element.ALIGN_LEFT);
+//    table.addCell(cell);
+//
+//    cell = new PdfPCell();
+//    cell.setBorder(Rectangle.NO_BORDER);
+//    table.addCell(cell);
+//
+//    table.addCell(getWoInfoTableNameColumn("Work Order No"));
+//    table.addCell(getWoInfoTableValueColumn("Placeholder Number"));
+//
+//    table.addCell(getWoInfoTableNameColumn("Work Order Raised By"));
+//    table.addCell(getWoInfoTableValueColumn("Placeholder Name"));
+//
+//    table.addCell(getWoInfoTableNameColumn("Work Order Raised On"));
+//    table.addCell(getWoInfoTableValueColumn(simpleDateFormat.format(System.currentTimeMillis())));
+//
+//    table.addCell(getWoInfoTableNameColumn("Sample Received Date"));
+//    table.addCell(getWoInfoTableValueColumn(simpleDateFormat.format(System.currentTimeMillis())));
+//
+//    table.addCell(getWoInfoTableNameColumn("SIM Card Manufacturer"));
+//    table.addCell(getWoInfoTableValueColumn("Placeholder Manufacturer"));
+//
+//    table.addCell(getWoInfoTableNameColumn("Testing Period"));
+//    table.addCell(getWoInfoTableValueColumn("10th Sep 2020 - 15th Sep 2020"));
+//
+//    table.addCell(getWoInfoTableNameColumn("Testing Method"));
+//    table.addCell(getWoInfoTableValueColumn("Stress Testing"));
+//
+//    table.addCell(getWoInfoTableNameColumn("Test Result(s)"));
+//    table.addCell(getWoInfoTableValueColumn("Please refer to next pages(s)"));
+//
+//    document.add(table);
+//
+//    // Call generateStaticContentPage and start on a new page
+//    document.newPage();
+//    generateStaticContentPage(document, "xxx circle");
+//
+//    Font font = new Font(FontFamily.TIMES_ROMAN, 13f, Font.NORMAL);
+//    List testCaseList = new List(12);
+//    testCaseList.setListSymbol("\u2022");
+//
+//    testCaseList.add(new ListItem(30, "Placeholder Test Case 1", font));
+//    testCaseList.add(new ListItem(30, "Placeholder Test Case 2", font));
+//
+//    testCaseList.setIndentationLeft(90);
+//    document.add(testCaseList);
+//}
+
+
 }
+//--------------------------------------------------------------------------------------------
